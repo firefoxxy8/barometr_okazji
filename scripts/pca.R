@@ -10,12 +10,23 @@ library(dplyr)
 
 # 1. Clean the data
 
-# 1.1 Remove columns we do not need
-offers_2 <- offers[,-c(2:5, 10, 16, 27:29, 35, 54:57)]
+# 1.1 Remove columns we do not need and 
+#     observation with wrong values 
+offers_2 <- offers[, -c(2:5, 10, 16, 27:29, 35, 54:57)]
+
+# wrong value in floors in building
+offers_2 <- offers_2[id %in% c()]
+
+# wrong values in construction year
+offers_2 <- offers_2[offers_2$construction_year <= 2018 &
+                       offers_2$construction_year > 1500,]
+
+# wrong values in area field
+offers_2 <- offers_2[offers_2$area <= 1000,]
 
 # 1.2 Construct other variables
 offers_2$is_last_floor <- as.factor(offers_2$floor == offers_2$floors_in_building)
-offers_2 <- offers_2 %>% mutate(average_room_area = rooms / area)
+offers_2 <- offers_2 %>% mutate(average_room_area = area / rooms)
 offers_2$is_first_floor <- as.factor(offers_2$floor == 1)
 
 
@@ -59,6 +70,34 @@ for (name in colnames(offers_4)){
 
 
 # 2. Normalize numeric variables
+
+# Check histograms
+
+numerics <- sapply(offers_4,function(col) is.numeric(col))
+numerics <- names(numerics[numerics==TRUE])
+numerics <- numerics[-1]
+
+for (v in names(numerics[numerics==TRUE])){
+  hist(offers_4[,v], main=v)
+}
+
+# transform to <0,1> interval
+normalize <- function(x){
+  sm <- summary(x)
+  x <- (x - sm[1]) / (sm[6]-sm[1])
+}
+
+
+offers_5 <- as.data.frame(sapply(offers_4, function(col){
+    if(is.numeric(col)){
+      normalize(col)
+    } else{
+      col
+    }
+  }
+))
+
+offers_5$id <- offers_4$id
 
 
 MCA
