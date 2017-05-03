@@ -1,11 +1,15 @@
-# Multiple Corespondence Analysis
+# Prepare dataset and reduce number of dimmensions
 
 # 0. Read dataset and load libraries
+library(randomForest)
+library(xlsx)
+library(dplyr)
+
 setwd("~/Desktop/barometr_okazji/barometr_okazji")
 offers <- read.csv('announcements.csv')
-
-library(FactoMineR)
-library(dplyr)
+districts_mapping <- read.xlsx('districts_mapping.xlsx',1)
+districts_mapping$district <- as.character(districts_mapping$district)
+districts_mapping$district_group <- as.character(districts_mapping$district_group)
 
 
 # 1. Clean the data
@@ -15,11 +19,11 @@ library(dplyr)
 offers_2 <- offers[, -c(2:5, 10, 16, 27:29, 35, 54:57)]
 
 # wrong value in floors in building
-offers_2 <- offers_2[id %in% c()]
+offers_2 <- offers_2[offers_2$id != 1413, ]
 
 # wrong values in construction year
-offers_2 <- offers_2[offers_2$construction_year <= 2018 &
-                       offers_2$construction_year > 1500,]
+offers_2 <- offers_2[(offers_2$construction_year <= 2018 &
+                       offers_2$construction_year > 1500) | is.na(offers_2$construction_year),]
 
 # wrong values in area field
 offers_2 <- offers_2[offers_2$area <= 1000,]
@@ -67,6 +71,26 @@ for (name in colnames(offers_4)){
   }  
 }
 
+# 1.5 Handle variables with too many categories
+sapply(offers_4, function(col) length(unique(col)))
+
+offers_4$street_or_settlement <- NULL
+
+offers_4$district <- gsub(' - Zobacz na mapie', '', as.character(offers_4$district))
+
+offers_4 <- merge(offers_4, districts_mapping, by='district', all.x=T)
+
+ind <- !is.na(offers_4$district) & is.na(offers_4$district_group)
+
+offers_4$district_group[ind] <- 'Grupa Inne'
+
+ind <- is.na(offers_4$district) | offers_4$district == ''
+
+offers_4$district_group[ind] <- 'Brak'
+
+offers_4$district <- NULL
+
+offers_4$district_group <- as.factor(offers_4$district_group)
 
 
 # 2. Normalize numeric variables
@@ -87,22 +111,54 @@ normalize <- function(x){
   x <- (x - sm[1]) / (sm[6]-sm[1])
 }
 
+offers_5 <- offers_4
 
-offers_5 <- as.data.frame(sapply(offers_4, function(col){
-    if(is.numeric(col)){
-      normalize(col)
-    } else{
-      col
-    }
+for(name in colnames(offers_5)){
+  v <- offers_5[,name]
+  if(is.numeric(v) & name != 'id'){
+    offers_5[,name] <- normalize(v)
   }
-))
-
-offers_5$id <- offers_4$id
+}
 
 
-MCA
+# 3. Use RandomForest to choose top predictors
 
-MCA(X, ncp = 5, ind.sup = NULL, quanti.sup = NULL,
-    quali.sup = NULL, excl=NULL, graph = TRUE,
-    level.ventil = 0, axes = c(1,2), row.w = NULL,
-    method="Indicator", na.method="NA", tab.disj=NULL)
+# add a target variable to dataset
+target <- offers %>% select(id, price_per_meter)
+offers_6 <- merge(offers_5, target, by='id', all.x=T)
+
+# build a simple model
+
+
+set.seed(2017)
+offers_6$id <- NULL
+fit <- randomForest( price_per_meter ~ .,
+                           data=offers_6, 
+                           importance=TRUE, 
+                           ntree=500)
+varImpPlot(fit)
+
+selected_vars <- c(
+  'construction_year',
+  'building_type', 
+  'district_group', 
+  'rooms', 
+  'area',
+  'floors_in_building', 
+  'cctv_or_security_agency',
+  'elevator', 
+  'windows_type',
+  'balcony'
+)
+
+other_vars <- c(
+  'id', 
+  'url',
+  'price',
+  'price_per_meter'
+)
+
+
+
+offers_final <- merge(offers_5, offers[,other_vars])[,c(other_vars, selected_vars)]
+save(offers_final, file='offers_final.Rdata')
