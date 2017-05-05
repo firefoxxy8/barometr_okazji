@@ -161,4 +161,19 @@ other_vars <- c(
 
 
 offers_final <- merge(offers_5, offers[,other_vars])[,c(other_vars, selected_vars)]
+
+
+# add values before normalization to display them in app
+init_vars <- c(
+  'construction_year',
+  'area',
+  'floors_in_building',
+  'district'
+)
+
+init <- offers[,c('id',init_vars)]
+colnames(init) <- c('id', paste(init_vars, 'init', sep='_'))
+
+offers_final <- merge(offers_final, init)
+
 save(offers_final, file='offers_final.Rdata')

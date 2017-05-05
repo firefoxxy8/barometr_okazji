@@ -5,16 +5,9 @@
 library(rvest)
 library(xlsx)
 
-sample_url <- 'https://www.otodom.pl/oferta/ciche-2-pok-mokotow-metro-0-prowizji-ID3docK.html'
-setwd("~/Desktop/barometr_okazji/barometr_okazji")
-load('offers_final.Rdata')
-districts_mapping <- read.xlsx('districts_mapping.xlsx',1)
-districts_mapping$district <- as.character(districts_mapping$district)
-districts_mapping$district_group <- as.character(districts_mapping$district_group)
-
 
 # 1. Exact function
-scrap_offer <- function(url){
+scrap_offer <- function(url, offers_final, districts_mapping){
   offer <- read_html(url)
   
   # Price
@@ -182,5 +175,5 @@ scrap_offer <- function(url){
   )
 }
 
-out <- scrap_offer(sample_url)
+#out <- scrap_offer(sample_url, offers_final, districts_mapping)
 
